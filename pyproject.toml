@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcpwarden"
+version = "0.1.0"
+description = "Security auditor for locally installed MCP servers"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Unterwegs" }]
+keywords = ["mcp", "security", "model-context-protocol", "audit", "supply-chain"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Topic :: Security",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "rich>=13.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+mcpwarden = "mcpwarden.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/UnterwegsDev/mcpwarden"
+Issues = "https://github.com/UnterwegsDev/mcpwarden/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcpwarden"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
