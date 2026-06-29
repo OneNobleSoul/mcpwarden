@@ -6,7 +6,9 @@ block itself. The stuff that needs a live connection lives in mcpclient.py.
 
 from __future__ import annotations
 
+import json
 import re
+import unicodedata
 
 from .config import ServerSpec
 from .findings import Finding, Severity
@@ -148,4 +150,95 @@ def scan_servers(specs: list[ServerSpec]) -> list[Finding]:
     out: list[Finding] = []
     for spec in specs:
         out.extend(scan_server(spec))
+    return out
+
+
+# --- tool-definition heuristics (need a live `tools/list`) -----------------
+
+# Instruction-shaped phrases aimed at the model rather than the human reader.
+INJECTION_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    ("override", re.compile(r"ignore\s+(?:all\s+|any\s+|the\s+)?(?:previous|prior|above)", re.I)),
+    ("override", re.compile(r"disregard\s+(?:all\s+|the\s+)?(?:previous|prior|earlier)", re.I)),
+    ("secrecy", re.compile(r"do\s+not\s+(?:tell|mention|inform|reveal|show)\b", re.I)),
+    ("secrecy", re.compile(r"without\s+(?:telling|informing|notifying)\s+the\s+user", re.I)),
+    ("exfil", re.compile(r"(?:read|cat|send|upload|exfiltrat\w*).{0,40}(?:~/\.ssh|id_rsa|\.env|"
+                          r"credentials|secret|api[_-]?key)", re.I)),
+    ("directive", re.compile(r"<(?:important|system|instructions?|secret)>", re.I)),
+    ("directive", re.compile(r"\byou\s+must\s+(?:always|never|also)\b", re.I)),
+]
+
+# zero-width, bidi overrides, BOM -- classic places to smuggle text
+_HIDDEN = re.compile(
+    "["
+    "​-‏"  # zero-width space/joiners, LRM/RLM
+    "‪-‮"  # bidi embedding/override
+    "⁠-⁤"  # word joiner, invisible operators
+    "⁦-⁩"  # bidi isolates
+    "﻿"         # BOM / zero-width no-break space
+    "]"
+)
+
+
+def _tool_text(tool: dict) -> str:
+    """Everything a model would actually read out of a tool definition."""
+    parts = [str(tool.get("description", ""))]
+    schema = tool.get("inputSchema") or tool.get("input_schema")
+    if isinstance(schema, dict):
+        parts.append(json.dumps(schema, ensure_ascii=False))
+    for key in ("annotations", "_meta"):
+        if key in tool:
+            parts.append(json.dumps(tool[key], ensure_ascii=False))
+    return "\n".join(parts)
+
+
+def scan_text(text: str, *, server: str | None, location: str | None) -> list[Finding]:
+    out: list[Finding] = []
+    seen: set[str] = set()
+    for kind, pat in INJECTION_PATTERNS:
+        m = pat.search(text)
+        if m and kind not in seen:
+            seen.add(kind)
+            out.append(
+                Finding(
+                    rule=f"poison.{kind}",
+                    severity=Severity.HIGH,
+                    title=f"Instruction-like text in tool definition ({kind})",
+                    detail=(
+                        f"matched {m.group(0)!r}. Tool definitions get fed to the model "
+                        f"verbatim, so wording like this is how tool poisoning works."
+                    ),
+                    server=server,
+                    location=location,
+                )
+            )
+
+    hidden = _HIDDEN.findall(text)
+    if hidden:
+        names = ", ".join(sorted({unicodedata.name(c, hex(ord(c))) for c in hidden}))
+        out.append(
+            Finding(
+                rule="poison.hidden-unicode",
+                severity=Severity.HIGH,
+                title="Hidden/invisible characters in tool definition",
+                detail=(
+                    f"found {len(hidden)} invisible char(s): {names}. These render as "
+                    f"nothing to you but still reach the model -- a common way to hide "
+                    f"instructions inside an otherwise innocent description."
+                ),
+                server=server,
+                location=location,
+            )
+        )
+    return out
+
+
+def scan_tool(server: str, tool: dict) -> list[Finding]:
+    name = str(tool.get("name", "<unnamed>"))
+    return scan_text(_tool_text(tool), server=server, location=name)
+
+
+def scan_tools(server: str, tools: list[dict]) -> list[Finding]:
+    out: list[Finding] = []
+    for tool in tools:
+        out.extend(scan_tool(server, tool))
     return out
