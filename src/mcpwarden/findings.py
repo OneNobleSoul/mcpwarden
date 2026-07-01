@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from functools import total_ordering
 
 
+@total_ordering
 class Severity(Enum):
     INFO = "info"
     LOW = "low"
@@ -17,13 +19,13 @@ class Severity(Enum):
     def rank(self) -> int:
         return _ORDER.index(self)
 
-    def __lt__(self, other: "Severity") -> bool:
+    def __lt__(self, other: object) -> bool:
         if not isinstance(other, Severity):
             return NotImplemented
         return self.rank < other.rank
 
     @classmethod
-    def parse(cls, value: str) -> "Severity":
+    def parse(cls, value: str) -> Severity:
         try:
             return cls(value.strip().lower())
         except ValueError as exc:
