@@ -9,9 +9,23 @@ from .detectors import scan_servers, scan_tools
 from .findings import Finding, Severity
 from .lockfile import Lockfile, build, diff
 from .mcpclient import MCPError, list_tools
-from .report import render
+from .report import exit_code, render, render_json
 
 DEFAULT_LOCK = Path("mcpwarden.lock")
+
+
+def _fail_on(value: str) -> Severity | None:
+    if value == "never":
+        return None
+    return Severity.parse(value)
+
+
+def _emit(findings: list[Finding], args: argparse.Namespace) -> int:
+    if getattr(args, "json", False):
+        render_json(findings)
+    else:
+        render(findings)
+    return exit_code(findings, _fail_on(args.fail_on))
 
 
 def _resolve_servers(args: argparse.Namespace) -> list[ServerSpec]:
@@ -59,8 +73,7 @@ def _collect_live_tools(
 def _cmd_scan(args: argparse.Namespace) -> int:
     servers = _resolve_servers(args)
     findings = scan_servers(servers)
-    render(findings)
-    return 1 if findings else 0
+    return _emit(findings, args)
 
 
 def _cmd_inspect(args: argparse.Namespace) -> int:
@@ -70,8 +83,7 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
     findings += scan_servers(servers)
     for name, tool_defs in tools.items():
         findings += scan_tools(name, tool_defs)
-    render(findings)
-    return 1 if any(f.severity >= Severity.MEDIUM for f in findings) else 0
+    return _emit(findings, args)
 
 
 def _cmd_pin(args: argparse.Namespace) -> int:
@@ -99,8 +111,7 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     # while we're connected anyway, re-run the poison heuristics
     for name, tool_defs in tools.items():
         findings += scan_tools(name, tool_defs)
-    render(findings)
-    return 1 if any(f.severity >= Severity.MEDIUM for f in findings) else 0
+    return _emit(findings, args)
 
 
 def _add_common(sub: argparse.ArgumentParser) -> None:
@@ -114,6 +125,15 @@ def _add_common(sub: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_output(sub: argparse.ArgumentParser) -> None:
+    sub.add_argument("--json", action="store_true", help="emit findings as JSON")
+    sub.add_argument(
+        "--fail-on", default="medium",
+        choices=["info", "low", "medium", "high", "critical", "never"],
+        help="exit non-zero when a finding at or above this level shows up (default: medium)",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mcpwarden",
@@ -124,10 +144,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     scan = sub.add_parser("scan", help="static audit of the discovered configs")
     _add_common(scan)
+    _add_output(scan)
     scan.set_defaults(func=_cmd_scan)
 
     inspect = sub.add_parser("inspect", help="connect to servers and audit their live tools")
     _add_common(inspect)
+    _add_output(inspect)
     inspect.add_argument("--timeout", type=float, default=20.0)
     inspect.set_defaults(func=_cmd_inspect)
 
@@ -139,6 +161,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     verify = sub.add_parser("verify", help="check live tools against the lockfile (rug-pulls)")
     _add_common(verify)
+    _add_output(verify)
     verify.add_argument("--timeout", type=float, default=20.0)
     verify.add_argument("--lock", type=Path, default=DEFAULT_LOCK)
     verify.set_defaults(func=_cmd_verify)

@@ -1,6 +1,9 @@
-"""Human-readable rendering of findings."""
+"""Rendering of findings, for humans and for machines."""
 
 from __future__ import annotations
+
+import json
+import sys
 
 from rich.console import Console
 from rich.table import Table
@@ -45,6 +48,29 @@ def render(findings: list[Finding], console: Console | None = None) -> None:
                       f"{f.rule}{where}\n    {f.detail}\n")
 
     console.print(_counts_line(findings))
+
+
+def render_json(findings: list[Finding], stream=None) -> None:
+    stream = stream or sys.stdout
+    payload = {
+        "findings": [f.as_dict() for f in sort_findings(findings)],
+        "summary": _counts(findings),
+    }
+    json.dump(payload, stream, indent=2)
+    stream.write("\n")
+
+
+def _counts(findings: list[Finding]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for f in findings:
+        counts[f.severity.value] = counts.get(f.severity.value, 0) + 1
+    return counts
+
+
+def exit_code(findings: list[Finding], fail_on: Severity | None) -> int:
+    if fail_on is None:
+        return 0
+    return 1 if any(f.severity >= fail_on for f in findings) else 0
 
 
 def _counts_line(findings: list[Finding]) -> str:
