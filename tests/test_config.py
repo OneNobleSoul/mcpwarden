@@ -57,6 +57,16 @@ def test_discover_skips_missing_and_broken(tmp_path):
     assert [s.name for s in servers] == ["a"]
 
 
+def test_disabled_server_skipped(tmp_path):
+    p = _write(tmp_path, "mcp.json", {
+        "mcpServers": {
+            "on": {"command": "node"},
+            "off": {"command": "node", "disabled": True},
+        }
+    })
+    assert [s.name for s in parse_config(p)] == ["on"]
+
+
 def test_discover_dedupes_same_file(tmp_path):
     good = _write(tmp_path, "good.json", {"mcpServers": {"a": {"command": "node"}}})
     servers = discover([good, good])

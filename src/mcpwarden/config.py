@@ -102,6 +102,8 @@ def parse_config(path: Path) -> list[ServerSpec]:
     for name, spec in _extract_servers_block(data).items():
         if not isinstance(spec, dict):
             continue
+        if spec.get("disabled") is True:
+            continue
         env = spec.get("env") or {}
         if not isinstance(env, dict):
             env = {}
