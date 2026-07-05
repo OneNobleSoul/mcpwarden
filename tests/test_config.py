@@ -1,6 +1,6 @@
 import json
 
-from mcpwarden.config import ServerSpec, discover, parse_config
+from mcpwarden.config import discover, parse_config
 
 
 def _write(tmp_path, name, payload):

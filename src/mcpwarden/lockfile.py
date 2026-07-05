@@ -50,7 +50,7 @@ class Lockfile:
         return json.dumps(body, indent=2, ensure_ascii=False) + "\n"
 
     @classmethod
-    def from_json(cls, text: str) -> "Lockfile":
+    def from_json(cls, text: str) -> Lockfile:
         data = json.loads(text)
         version = int(data.get("version", LOCK_VERSION))
         if version != LOCK_VERSION:
@@ -65,7 +65,7 @@ class Lockfile:
         Path(path).write_text(self.to_json(), encoding="utf-8")
 
     @classmethod
-    def load(cls, path: Path) -> "Lockfile":
+    def load(cls, path: Path) -> Lockfile:
         return cls.from_json(Path(path).read_text(encoding="utf-8"))
 
 

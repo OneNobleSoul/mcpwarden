@@ -25,7 +25,9 @@ SECRET_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 ]
 
 # env keys that read like a credential
-SECRET_KEY_HINT = re.compile(r"(?:_|\b)(TOKEN|SECRET|PASSWORD|PASSWD|APIKEY|API_KEY|ACCESS_KEY)\b", re.I)
+SECRET_KEY_HINT = re.compile(
+    r"(?:_|\b)(TOKEN|SECRET|PASSWORD|PASSWD|APIKEY|API_KEY|ACCESS_KEY)\b", re.I
+)
 
 # values that clearly aren't a real secret, so we don't cry wolf
 PLACEHOLDER = re.compile(

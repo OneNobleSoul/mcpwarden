@@ -12,7 +12,7 @@ import os
 import select
 import subprocess
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from .config import ServerSpec
 
