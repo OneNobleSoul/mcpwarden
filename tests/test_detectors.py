@@ -18,6 +18,19 @@ def test_hardcoded_github_token_flagged():
     assert findings[0].severity is Severity.HIGH
 
 
+def test_stripe_and_gitlab_tokens_flagged():
+    spec = ServerSpec(
+        name="pay",
+        command="node",
+        env={
+            "STRIPE_KEY": "sk_live_51ABCDEFGHIJKLMNOPQRSTUV",
+            "GL": "glpat-abcdef1234567890ABCD",
+        },
+    )
+    findings = scan_env(spec)
+    assert len([f for f in findings if f.rule == "secret.hardcoded"]) == 2
+
+
 def test_placeholder_env_not_flagged():
     spec = ServerSpec(name="x", command="node", env={"API_TOKEN": "${GITHUB_TOKEN}"})
     assert scan_env(spec) == []
