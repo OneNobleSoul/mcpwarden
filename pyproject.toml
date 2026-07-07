@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcpwarden"
-version = "0.1.0"
+version = "0.2.0"
 description = "Security auditor for locally installed MCP servers"
 readme = "README.md"
 requires-python = ">=3.11"
