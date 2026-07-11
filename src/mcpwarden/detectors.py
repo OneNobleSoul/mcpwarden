@@ -183,6 +183,26 @@ _HIDDEN = re.compile(
     "]"
 )
 
+# Unicode tag block (U+E0000-U+E007F). Invented for defunct language tags,
+# now mostly known for "ASCII smuggling": tag chars mirror the printable
+# ASCII range 1:1 (codepoint - 0xE0000), render as nothing in any font
+# we've checked, and can carry a full sentence of hidden instructions.
+_TAG_CHARS = re.compile("[\U000e0000-\U000e007f]")
+
+
+def _decode_tags(text: str) -> str:
+    """Best-effort decode of a tag-character run back to the ASCII it hides."""
+    out = []
+    for ch in text:
+        code = ord(ch)
+        if 0xE0020 <= code <= 0xE007E:
+            out.append(chr(code - 0xE0000))
+        elif code in (0xE0000, 0xE007F):
+            continue  # cancel tag / unused base -- nothing printable
+        else:
+            out.append("?")
+    return "".join(out).strip()
+
 
 def _tool_text(tool: dict) -> str:
     """Everything a model would actually read out of a tool definition."""
@@ -230,6 +250,26 @@ def scan_text(text: str, *, server: str | None, location: str | None) -> list[Fi
                     f"nothing to you but still reach the model -- a common way to hide "
                     f"instructions inside an otherwise innocent description."
                 ),
+                server=server,
+                location=location,
+            )
+        )
+
+    tags = _TAG_CHARS.findall(text)
+    if tags:
+        decoded = _decode_tags("".join(tags))
+        detail = (
+            f"found {len(tags)} Unicode tag character(s) -- invisible in every font "
+            f"we've checked."
+        )
+        if decoded:
+            detail += f" decoded, they read: {decoded!r}"
+        out.append(
+            Finding(
+                rule="poison.hidden-unicode-tags",
+                severity=Severity.CRITICAL,
+                title="Unicode tag-block smuggling in tool definition",
+                detail=detail,
                 server=server,
                 location=location,
             )

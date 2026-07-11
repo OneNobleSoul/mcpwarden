@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+- detect Unicode tag-block characters (U+E0000-U+E007F) in tool
+  descriptions/schemas and decode them — this is the "ASCII smuggling"
+  trick, invisible in every font but readable 1:1 as ASCII once you know
+  the offset
+
 ## 0.2.0
 
 - `inspect`, `pin` and `verify` commands backed by a minimal stdio MCP client
