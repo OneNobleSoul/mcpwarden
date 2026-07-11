@@ -78,6 +78,8 @@ mcpwarden verify --fail-on high --json
 - instruction-shaped text aimed at the model ("ignore previous…", "do not tell
   the user…", `<important>` blocks, references to reading `~/.ssh` / `.env`)
 - invisible/zero-width and bidi characters hidden inside descriptions or schemas
+- Unicode tag-block characters (the ASCII-smuggling trick) — decoded and shown
+  in the finding, not just flagged
 - changed / added / removed tools versus the lockfile (rug-pull detection)
 
 Findings have a severity and a stable `rule` id, so you can grep them or gate on
