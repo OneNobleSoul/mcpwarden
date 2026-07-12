@@ -5,7 +5,7 @@ from pathlib import Path
 
 from . import __version__
 from .config import ServerSpec, discover
-from .detectors import scan_servers, scan_tools
+from .detectors import scan_servers, scan_shadow_tools, scan_tools
 from .findings import Finding, Severity
 from .lockfile import Lockfile, build, diff
 from .mcpclient import MCPError, list_tools
@@ -83,6 +83,7 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
     findings += scan_servers(servers)
     for name, tool_defs in tools.items():
         findings += scan_tools(name, tool_defs)
+    findings += scan_shadow_tools(tools)
     return _emit(findings, args)
 
 
@@ -108,9 +109,10 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     live = build(tools)
     findings = list(problems)
     findings += diff(pinned, live)
-    # while we're connected anyway, re-run the poison heuristics
+    # while we're connected anyway, re-run the poison + shadow heuristics
     for name, tool_defs in tools.items():
         findings += scan_tools(name, tool_defs)
+    findings += scan_shadow_tools(tools)
     return _emit(findings, args)
 
 

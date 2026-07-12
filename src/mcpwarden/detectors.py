@@ -6,6 +6,7 @@ block itself. The stuff that needs a live connection lives in mcpclient.py.
 
 from __future__ import annotations
 
+import difflib
 import json
 import re
 import unicodedata
@@ -286,4 +287,106 @@ def scan_tools(server: str, tools: list[dict]) -> list[Finding]:
     out: list[Finding] = []
     for tool in tools:
         out.extend(scan_tool(server, tool))
+    return out
+
+
+# --- cross-server tool shadowing --------------------------------------------
+#
+# MCP has no cryptographic tool identity -- a client tells two tools apart by
+# name and server context, nothing more. If two servers in the same config
+# both expose a tool called `read_file` (or something close enough to it),
+# the model can't reliably tell which one it's actually calling, and a
+# malicious server can lean on that: register a tool that collides with, or
+# closely imitates, one from a server you trust.
+#
+# This only compares tools/list results that inspect/verify already pulled --
+# no extra connections, no lockfile required.
+
+_CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+
+# name similarity alone is noisy for short, generic names ("get", "list") --
+# require a bit of length before trusting a fuzzy match.
+_MIN_NAME_LEN = 4
+_NAME_SIMILARITY = 0.86
+_DESC_SIMILARITY = 0.6
+
+
+def _normalize_tool_name(name: str) -> str:
+    """Fold naming-convention noise so read_file/readFile/read-file compare equal."""
+    split = _CAMEL_BOUNDARY.sub("_", name)
+    split = re.sub(r"[^0-9a-zA-Z]+", "_", split)
+    return split.strip("_").lower()
+
+
+def _ratio(a: str, b: str) -> float:
+    if not a or not b:
+        return 0.0
+    return difflib.SequenceMatcher(None, a, b).ratio()
+
+
+def scan_shadow_tools(tools: dict[str, list[dict]]) -> list[Finding]:
+    """Compare tool names/descriptions pairwise across different servers."""
+    entries = []
+    for server, tool_defs in tools.items():
+        for tool in tool_defs:
+            name = str(tool.get("name", "")).strip()
+            if not name:
+                continue
+            entries.append(
+                (server, name, _normalize_tool_name(name), str(tool.get("description", "")))
+            )
+
+    out: list[Finding] = []
+    for i, (server_a, name_a, norm_a, desc_a) in enumerate(entries):
+        for server_b, name_b, norm_b, desc_b in entries[i + 1:]:
+            if server_a == server_b:
+                continue
+            desc_ratio = _ratio(desc_a, desc_b)
+
+            if norm_a == norm_b:
+                if desc_ratio >= _DESC_SIMILARITY:
+                    severity = Severity.LOW
+                    note = (
+                        "descriptions read alike too -- probably two legitimate servers "
+                        "offering the same tool"
+                    )
+                else:
+                    severity = Severity.MEDIUM
+                    note = "descriptions differ -- worth checking which one you meant to call"
+                out.append(
+                    Finding(
+                        rule="shadow.name-collision",
+                        severity=severity,
+                        title=f"`{name_a}` is offered by both {server_a} and {server_b}",
+                        detail=(
+                            f"{server_a} and {server_b} both expose a tool named `{name_a}`. "
+                            f"MCP has no cryptographic tool identity, so a client can't tell "
+                            f"them apart beyond the name -- {note}."
+                        ),
+                        server=f"{server_a}, {server_b}",
+                        location=name_a,
+                    )
+                )
+                continue
+
+            if len(norm_a) < _MIN_NAME_LEN or len(norm_b) < _MIN_NAME_LEN:
+                continue
+
+            name_ratio = _ratio(norm_a, norm_b)
+            if name_ratio >= _NAME_SIMILARITY and desc_ratio >= _DESC_SIMILARITY:
+                out.append(
+                    Finding(
+                        rule="shadow.name-similar",
+                        severity=Severity.HIGH,
+                        title=f"`{name_a}` ({server_a}) looks like `{name_b}` ({server_b})",
+                        detail=(
+                            f"names are {name_ratio:.0%} similar and descriptions are "
+                            f"{desc_ratio:.0%} similar across two different servers -- a "
+                            f"typosquat shape, a near-identical tool copied under a "
+                            f"near-identical name."
+                        ),
+                        server=f"{server_a}, {server_b}",
+                        location=f"{name_a} ~ {name_b}",
+                    )
+                )
     return out
