@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- `inspect`/`verify` now compare tool names and descriptions across all
+  configured servers and flag exact name collisions and near-identical
+  (fuzzy name + description) matches between different servers — MCP tool
+  shadowing/typosquatting
+
 ## 0.2.1
 
 - detect Unicode tag-block characters (U+E0000-U+E007F) in tool
