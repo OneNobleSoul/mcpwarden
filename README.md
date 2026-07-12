@@ -85,6 +85,28 @@ mcpwarden verify --fail-on high --json
 Findings have a severity and a stable `rule` id, so you can grep them or gate on
 `--fail-on`.
 
+## Shadow tools
+
+`inspect` and `verify` also compare tool names and descriptions **across** every
+server in your config. MCP has no cryptographic tool identity — a client tells
+two tools apart by name alone — so nothing stops a second server from exposing
+a tool called `read_file` that collides with, or closely imitates, one you
+already trust.
+
+- an exact name collision between two different servers is always flagged
+  (`shadow.name-collision`); severity depends on whether the descriptions also
+  match — two legitimate servers offering the same tool read as low, a
+  mismatch is worth a second look
+- a name that's close-but-not-identical (`readFile` vs `read_file`, a typo, an
+  extra character) combined with a similar description is flagged high
+  (`shadow.name-similar`) — that combination is the shape of a typosquat, not
+  a coincidence
+- tools within the same server are never compared against each other, and
+  short/generic names need more than fuzzy similarity before they're trusted
+
+This needs no lockfile and no extra connections — it runs on whatever
+`inspect`/`verify` already pulled from `tools/list`.
+
 ## The lockfile
 
 `mcpwarden.lock` is a plain JSON map of `server -> tool -> sha256`. The hash
