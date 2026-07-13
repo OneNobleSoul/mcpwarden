@@ -1,6 +1,6 @@
 # mcpwarden
 
-[![CI](https://github.com/UnterwegsDev/mcpwarden/actions/workflows/ci.yml/badge.svg)](https://github.com/UnterwegsDev/mcpwarden/actions/workflows/ci.yml)
+[![CI](https://github.com/OneNobleSoul/mcpwarden/actions/workflows/ci.yml/badge.svg)](https://github.com/OneNobleSoul/mcpwarden/actions/workflows/ci.yml)
 ![python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
