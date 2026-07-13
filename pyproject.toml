@@ -9,7 +9,7 @@ description = "Security auditor for locally installed MCP servers"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
-authors = [{ name = "Unterwegs" }]
+authors = [{ name = "OneNobleSoul" }]
 keywords = ["mcp", "security", "model-context-protocol", "audit", "supply-chain"]
 classifiers = [
     "Environment :: Console",
@@ -33,8 +33,8 @@ dev = [
 mcpwarden = "mcpwarden.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/UnterwegsDev/mcpwarden"
-Issues = "https://github.com/UnterwegsDev/mcpwarden/issues"
+Homepage = "https://github.com/OneNobleSoul/mcpwarden"
+Issues = "https://github.com/OneNobleSoul/mcpwarden/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mcpwarden"]
