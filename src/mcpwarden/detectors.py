@@ -47,6 +47,18 @@ def _basename(cmd: str) -> str:
     return cmd.replace("\\", "/").rsplit("/", 1)[-1].lower()
 
 
+def _has_version_pin(arg: str) -> bool:
+    """True if a runner arg carries an explicit `@version`.
+
+    Scoped npm packages (`@scope/name@1.2.3`) start with `@` for the scope,
+    not a version, so that leading char has to be stripped before checking
+    for the real pin -- otherwise every scoped package looks unpinned even
+    when it's version-locked.
+    """
+    body = arg[1:] if arg.startswith("@") else arg
+    return "@" in body
+
+
 def scan_env(spec: ServerSpec) -> list[Finding]:
     out: list[Finding] = []
     for key, value in spec.env.items():
@@ -127,7 +139,7 @@ def scan_command(spec: ServerSpec) -> list[Finding]:
         )
 
     if base in _RUNNERS:
-        pinned = any("@" in a and not a.startswith("@") for a in spec.args)
+        pinned = any(_has_version_pin(a) for a in spec.args)
         if not pinned:
             out.append(
                 Finding(

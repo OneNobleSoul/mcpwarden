@@ -71,6 +71,22 @@ def test_pinned_npx_not_flagged():
     assert "command.unpinned-runner" not in _rules(scan_command(spec))
 
 
+def test_pinned_scoped_npx_not_flagged():
+    spec = ServerSpec(
+        name="x",
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-filesystem@0.6.2"],
+    )
+    assert "command.unpinned-runner" not in _rules(scan_command(spec))
+
+
+def test_unpinned_scoped_npx_is_medium():
+    spec = ServerSpec(
+        name="x", command="npx", args=["-y", "@modelcontextprotocol/server-filesystem"]
+    )
+    assert "command.unpinned-runner" in _rules(scan_command(spec))
+
+
 def test_clean_server_has_no_findings():
     spec = ServerSpec(name="ok", command="node", args=["server.js"], env={"PORT": "8080"})
     assert scan_server(spec) == []
