@@ -33,6 +33,13 @@ SECRET_KEY_HINT = re.compile(
     r"(?:_|\b)(TOKEN|SECRET|PASSWORD|PASSWD|APIKEY|API_KEY|ACCESS_KEY)\b", re.I
 )
 
+# words that show up in tool schemas/descriptions when a capability is being
+# widened -- shared by the scope-creep classifier in lockfile.py
+CAPABILITY_HINT = re.compile(
+    r"\b(admin|sudo|root|force|recursive|all|delete|overwrite|bypass|"
+    r"unrestricted|elevated|dangerous|unsafe|write|exec(?:ute)?)\b", re.I
+)
+
 # values that clearly aren't a real secret, so we don't cry wolf
 PLACEHOLDER = re.compile(
     r"^\s*(\$\{.*\}|<.*>|your[_-].*|xxx+|changeme|placeholder|todo|\.\.\.|)\s*$", re.I
