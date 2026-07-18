@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0
+
+- lockfile now snapshots a reduced schema (required params, enum
+  constraints, `additionalProperties`, annotations, description) alongside
+  the hash for each tool, so a `lock.tool-redefined` hit can be classified
+  instead of just flagged flat HIGH — `scope.widened` looks at what
+  specifically changed and grades it (MCP02 scope-creep)
+- older hash-only lockfiles keep working (`lock.stale-format` note, no
+  classification until re-pinned)
+
 ## 0.3.0
 
 - `inspect`/`verify` now compare tool names and descriptions across all
