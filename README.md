@@ -81,6 +81,8 @@ mcpwarden verify --fail-on high --json
 - Unicode tag-block characters (the ASCII-smuggling trick) — decoded and shown
   in the finding, not just flagged
 - changed / added / removed tools versus the lockfile (rug-pull detection)
+- capability increases hiding inside a "changed" tool — new required params,
+  loosened schemas, unsafe annotation flips (see below)
 
 Findings have a severity and a stable `rule` id, so you can grep them or gate on
 `--fail-on`.
@@ -109,10 +111,26 @@ This needs no lockfile and no extra connections — it runs on whatever
 
 ## The lockfile
 
-`mcpwarden.lock` is a plain JSON map of `server -> tool -> sha256`. The hash
-covers the whole tool definition except the display-only `title`, so any change
-to a description or input schema moves it. Commit it next to your MCP config and
+`mcpwarden.lock` is JSON, `server -> tool -> { hash, schema }`. The hash covers
+the whole tool definition except the display-only `title`, so any change to a
+description or input schema moves it. Commit it next to your MCP config and
 `verify` becomes a diff you can trust.
+
+`schema` is a small snapshot (required params, enum constraints,
+`additionalProperties`, annotations, description) kept alongside the hash so a
+redefined tool doesn't just get flagged as "changed" — `verify` can tell you
+*what* changed. When a hash moves, `scope.widened` looks at the specific
+signals: a param that became required, an enum losing values,
+`additionalProperties` going from `false` to open, a new parameter named like
+a capability (`force`, `recursive`, `bypass`, ...), or a tool annotation
+flipping from safe to unsafe (`readOnlyHint` dropped, `destructiveHint`
+newly set). A single weak signal stays quiet — a typo fix shouldn't page
+anyone — severity only climbs when independent signals line up.
+
+Lockfiles from before this landed only hold hashes. They keep working exactly
+as before (`lock.tool-redefined` still fires), just without the extra
+classification; `verify` leaves a one-time `lock.stale-format` note nudging a
+re-pin.
 
 ## Limitations / notes
 
