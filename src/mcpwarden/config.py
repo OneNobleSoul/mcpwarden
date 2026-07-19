@@ -120,12 +120,27 @@ def parse_config(path: Path) -> list[ServerSpec]:
     return servers
 
 
-def discover(paths: list[Path] | None = None) -> list[ServerSpec]:
-    """Parse every readable config we can find, skipping the ones that aren't there."""
+@dataclass
+class ConfigError:
+    path: Path
+    message: str
+
+
+def discover_configs(paths: list[Path] | None = None) -> tuple[list[ServerSpec], list[ConfigError]]:
+    """Parse every readable config we can find.
+
+    Missing files are skipped without comment -- most of the candidate paths
+    won't exist on a given box, that's expected. A file that *is* there but
+    fails to parse (bad JSON, not an object, unreadable) is different: it's
+    a config someone actually has, and staying quiet about it means `scan`
+    can come back clean while a broken config sat there unaudited. Those are
+    returned as ConfigErrors so the caller can surface them.
+    """
     if paths is None:
         paths = default_config_paths()
 
     found: list[ServerSpec] = []
+    errors: list[ConfigError] = []
     seen_files: set[Path] = set()
     for path in paths:
         path = Path(path)
@@ -138,7 +153,12 @@ def discover(paths: list[Path] | None = None) -> list[ServerSpec]:
         seen_files.add(resolved)
         try:
             found.extend(parse_config(path))
-        except (json.JSONDecodeError, OSError, ValueError):
-            # a malformed config isn't our job to fix here; scan reports it separately
-            continue
-    return found
+        except (json.JSONDecodeError, OSError, ValueError) as exc:
+            errors.append(ConfigError(path=path, message=str(exc)))
+    return found, errors
+
+
+def discover(paths: list[Path] | None = None) -> list[ServerSpec]:
+    """Parse every readable config we can find, skipping the ones that aren't there."""
+    servers, _ = discover_configs(paths)
+    return servers

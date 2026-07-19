@@ -1,6 +1,6 @@
 import json
 
-from mcpwarden.config import discover, parse_config
+from mcpwarden.config import discover, discover_configs, parse_config
 
 
 def _write(tmp_path, name, payload):
@@ -55,6 +55,19 @@ def test_discover_skips_missing_and_broken(tmp_path):
 
     servers = discover([good, bad, missing])
     assert [s.name for s in servers] == ["a"]
+
+
+def test_discover_configs_reports_parse_errors(tmp_path):
+    good = _write(tmp_path, "good.json", {"mcpServers": {"a": {"command": "node"}}})
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json", encoding="utf-8")
+    not_an_object = _write(tmp_path, "list.json", ["oops"])
+    missing = tmp_path / "nope.json"
+
+    servers, errors = discover_configs([good, bad, not_an_object, missing])
+    assert [s.name for s in servers] == ["a"]
+    assert {e.path for e in errors} == {bad, not_an_object}
+    assert all(e.message for e in errors)
 
 
 def test_disabled_server_skipped(tmp_path):
