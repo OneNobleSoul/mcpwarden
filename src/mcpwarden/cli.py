@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 from . import __version__
-from .config import ServerSpec, discover
+from .config import ServerSpec, discover_configs
 from .detectors import scan_servers, scan_shadow_tools, scan_tools
 from .findings import Finding, Severity
 from .lockfile import Lockfile, build, diff
@@ -28,13 +28,23 @@ def _emit(findings: list[Finding], args: argparse.Namespace) -> int:
     return exit_code(findings, _fail_on(args.fail_on))
 
 
-def _resolve_servers(args: argparse.Namespace) -> list[ServerSpec]:
+def _resolve_servers(args: argparse.Namespace) -> tuple[list[ServerSpec], list[Finding]]:
     paths = [Path(p) for p in args.config] if args.config else None
-    servers = discover(paths)
+    servers, errors = discover_configs(paths)
     wanted = getattr(args, "server", None)
     if wanted:
         servers = [s for s in servers if s.name in set(wanted)]
-    return servers
+    findings = [
+        Finding(
+            rule="config.parse-error",
+            severity=Severity.LOW,
+            title=f"Could not parse {err.path}",
+            detail=f"{err.message}. Servers in this file were skipped, not audited.",
+            location=str(err.path),
+        )
+        for err in errors
+    ]
+    return servers, findings
 
 
 def _collect_live_tools(
@@ -71,15 +81,17 @@ def _collect_live_tools(
 
 
 def _cmd_scan(args: argparse.Namespace) -> int:
-    servers = _resolve_servers(args)
-    findings = scan_servers(servers)
+    servers, config_findings = _resolve_servers(args)
+    findings = list(config_findings)
+    findings += scan_servers(servers)
     return _emit(findings, args)
 
 
 def _cmd_inspect(args: argparse.Namespace) -> int:
-    servers = _resolve_servers(args)
+    servers, config_findings = _resolve_servers(args)
     tools, problems = _collect_live_tools(servers, args.timeout)
-    findings = list(problems)
+    findings = list(config_findings)
+    findings += problems
     findings += scan_servers(servers)
     for name, tool_defs in tools.items():
         findings += scan_tools(name, tool_defs)
@@ -88,10 +100,10 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
 
 
 def _cmd_pin(args: argparse.Namespace) -> int:
-    servers = _resolve_servers(args)
+    servers, config_findings = _resolve_servers(args)
     tools, problems = _collect_live_tools(servers, args.timeout)
-    if problems:
-        render(problems)
+    if config_findings or problems:
+        render(config_findings + problems)
     lock = build(tools)
     lock.save(args.lock)
     total = sum(len(t) for t in tools.values())
@@ -104,10 +116,11 @@ def _cmd_verify(args: argparse.Namespace) -> int:
         print(f"no lockfile at {args.lock}; run `mcpwarden pin` first")
         return 2
     pinned = Lockfile.load(args.lock)
-    servers = _resolve_servers(args)
+    servers, config_findings = _resolve_servers(args)
     tools, problems = _collect_live_tools(servers, args.timeout)
     live = build(tools)
-    findings = list(problems)
+    findings = list(config_findings)
+    findings += problems
     findings += diff(pinned, live)
     # while we're connected anyway, re-run the poison + shadow heuristics
     for name, tool_defs in tools.items():
